@@ -89,8 +89,8 @@ export default function DatabasePage() {
                   <button
                     type="button"
                     onClick={() => setSelectedTable(t)}
-                    className={`w-full truncate rounded px-2.5 py-1.5 text-left font-mono text-xs ${
-                      selectedTable === t ? "bg-sky-500/15 text-sky-300" : "hover:bg-slate-700/40"
+                    className={`w-full truncate rounded-xl px-3 py-2 text-left font-mono text-xs transition ${
+                      selectedTable === t ? "bg-teal-500/15 font-semibold text-teal-400 ring-1 ring-teal-500/30" : "hover:bg-bg-raised/80"
                     }`}
                   >
                     {t}

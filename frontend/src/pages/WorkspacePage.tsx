@@ -9,6 +9,13 @@ import { ProjectSelect } from "../components/ProjectSelect";
 import { RunPanel } from "../components/RunPanel";
 import { Async, EmptyState, ErrorBox, Loading, PageHeader, Spinner } from "../components/ui";
 
+const SUGGESTED_PROMPTS = [
+  "Explain the project architecture and scan for security vulnerabilities",
+  "Inspect the database tables and generate schema documentation",
+  "Detect test frameworks and run the pytest test suite",
+  "Find duplicate code blocks across the workspace",
+];
+
 export default function WorkspacePage() {
   const { conversationId } = useParams();
   const convId = conversationId ? Number(conversationId) : null;
@@ -41,7 +48,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     if (convId !== null && createdRef.current === convId) {
-      createdRef.current = null; // just created by send(); send() loads the detail itself
+      createdRef.current = null;
       return;
     }
     setDetail(null);
@@ -54,9 +61,8 @@ export default function WorkspacePage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [detail?.messages.length, activeRunId]);
 
-  async function send(e: FormEvent) {
-    e.preventDefault();
-    const content = draft.trim();
+  async function sendText(rawText: string) {
+    const content = rawText.trim();
     if (!content || sending) return;
     setSending(true);
     setSendError(null);
@@ -80,6 +86,11 @@ export default function WorkspacePage() {
     }
   }
 
+  async function send(e: FormEvent) {
+    e.preventDefault();
+    await sendText(draft);
+  }
+
   async function removeConversation(id: number) {
     if (!window.confirm("Delete this conversation?")) return;
     try {
@@ -101,28 +112,42 @@ export default function WorkspacePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="AI Workspace" subtitle="Describe an objective; the agent calls MCP tools and reports every step." />
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[16rem_1fr]">
-        <aside className="card flex min-h-0 flex-col p-3">
-          <div className="mb-2 space-y-2">
-            <ProjectSelect value={projectId} onChange={setProjectId} noneLabel="All / no project" />
+      <PageHeader
+        title="AI Developer Workspace"
+        subtitle="Describe your engineering goal in natural language. DevPilot plans and executes across isolated MCP tools."
+      />
+      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[18rem_1fr]">
+        <aside className="card flex min-h-0 flex-col p-4">
+          <div className="mb-3 space-y-2.5">
+            <ProjectSelect value={projectId} onChange={setProjectId} noneLabel="All / default workspace" />
             <button className="btn btn-primary w-full" onClick={() => nav("/workspace")}>
               + New conversation
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto pt-1">
             <Async loading={convs.loading} error={convs.error} onRetry={convs.reload}>
               {(convs.data ?? []).length === 0 ? (
-                <p className="py-3 text-center text-xs text-slate-500">No conversations yet.</p>
+                <p className="py-6 text-center text-xs text-slate-500">No conversations yet.</p>
               ) : (
-                <ul className="space-y-1">
+                <ul className="space-y-1.5">
                   {(convs.data ?? []).map((c) => (
-                    <li key={c.id} className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${c.id === convId ? "bg-sky-500/15" : "hover:bg-slate-700/40"}`}>
+                    <li
+                      key={c.id}
+                      className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm transition ${
+                        c.id === convId
+                          ? "bg-teal-500/15 text-teal-300 ring-1 ring-teal-500/30"
+                          : "hover:bg-bg-raised/80"
+                      }`}
+                    >
                       <button className="min-w-0 flex-1 text-left" onClick={() => nav(`/workspace/${c.id}`)}>
-                        <span className="block truncate">{c.title || `Conversation ${c.id}`}</span>
-                        <span className="block text-xs text-slate-500">{fmtDate(c.created_at)}</span>
+                        <span className="block truncate font-medium">{c.title || `Conversation ${c.id}`}</span>
+                        <span className="block text-[11px] text-slate-500">{fmtDate(c.created_at)}</span>
                       </button>
-                      <button className="text-xs text-slate-500 hover:text-red-300" aria-label={`Delete conversation ${c.id}`} onClick={() => void removeConversation(c.id)}>
+                      <button
+                        className="rounded p-1 text-xs text-slate-500 opacity-70 hover:bg-rose-500/15 hover:text-rose-300 group-hover:opacity-100"
+                        aria-label={`Delete conversation ${c.id}`}
+                        onClick={() => void removeConversation(c.id)}
+                      >
                         ✕
                       </button>
                     </li>
@@ -133,19 +158,49 @@ export default function WorkspacePage() {
           </div>
         </aside>
 
-        <section className="card flex min-h-[60vh] min-w-0 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            {convId === null && !activeRunId && <EmptyState>Start a new conversation by typing an objective below.</EmptyState>}
+        <section className="card flex min-h-[65vh] min-w-0 flex-col">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+            {convId === null && !activeRunId && (
+              <div className="space-y-4 py-6">
+                <EmptyState>
+                  <p className="font-display text-base font-semibold text-slate-200">What would you like DevPilot to investigate or build?</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Choose a starter prompt below or type any instruction in the composer.
+                  </p>
+                </EmptyState>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {SUGGESTED_PROMPTS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setDraft(p)}
+                      className="rounded-xl border border-bg-border bg-bg/60 p-3.5 text-left text-xs text-slate-300 transition hover:border-teal-500/40 hover:bg-bg-raised/70"
+                    >
+                      <span className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-teal-400">Starter Prompt</span>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {detailLoading && <Loading />}
             {detailError && <ErrorBox message={detailError} onRetry={() => convId !== null && void loadDetail(convId)} />}
             {messages.map((m) => {
               const showRun = m.run_id !== null && !shownRuns.has(m.run_id);
               if (m.run_id !== null) shownRuns.add(m.run_id);
               return (
-                <div key={m.id} className="space-y-2">
+                <div key={m.id} className="space-y-3">
                   <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[90%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${m.role === "user" ? "bg-sky-600/30" : "bg-bg-raised"}`}>
-                      <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-500">{m.role}</p>
+                    <div
+                      className={`max-w-[90%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                        m.role === "user"
+                          ? "border border-teal-500/30 bg-teal-500/15 text-slate-100"
+                          : "border border-bg-border/80 bg-bg-raised/85 text-slate-200"
+                      }`}
+                    >
+                      <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-teal-400">
+                        {m.role === "user" ? "Developer" : "DevPilot Assistant"}
+                      </p>
                       {m.content}
                     </div>
                   </div>
@@ -158,16 +213,17 @@ export default function WorkspacePage() {
             {activeRunId !== null && !shownRuns.has(activeRunId) && <RunPanel runId={activeRunId} onSettled={settled} />}
             <div ref={bottomRef} />
           </div>
-          <form onSubmit={send} className="border-t border-bg-border p-3">
+
+          <form onSubmit={send} className="border-t border-bg-border/70 bg-bg/40 p-4 rounded-b-2xl">
             {sendError && (
-              <div className="mb-2">
+              <div className="mb-3">
                 <ErrorBox message={sendError} />
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <textarea
                 className="input h-20 resize-none"
-                placeholder="What should DevPilot do? (Enter to send, Shift+Enter for newline)"
+                placeholder="Ask DevPilot to analyze code, query your database, run tests, or inspect deployments… (Enter to send)"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -177,7 +233,7 @@ export default function WorkspacePage() {
                   }
                 }}
               />
-              <button className="btn btn-primary self-end" disabled={sending || !draft.trim()} type="submit">
+              <button className="btn btn-primary self-end px-5 py-2.5" disabled={sending || !draft.trim()} type="submit">
                 {sending ? <Spinner /> : "Send"}
               </button>
             </div>

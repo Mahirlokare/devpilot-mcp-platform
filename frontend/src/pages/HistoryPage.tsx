@@ -77,14 +77,14 @@ export default function HistoryPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/history/${r.id}`)}
-                        className={`w-full rounded border px-3 py-2 text-left transition ${
+                        className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition ${
                           active
-                            ? "border-sky-500/60 bg-sky-500/15"
-                            : "border-bg-border bg-bg hover:border-slate-600"
+                            ? "border-teal-500/50 bg-teal-500/15 ring-1 ring-teal-500/30"
+                            : "border-bg-border bg-bg/70 hover:border-teal-500/30 hover:bg-bg-raised/60"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-xs text-sky-300">#{r.id}</span>
+                          <span className="font-mono text-xs font-semibold text-teal-400">#{r.id}</span>
                           <RunBadge status={r.status} />
                         </div>
                         <p className="mt-1 line-clamp-2 text-sm">{r.objective || "—"}</p>

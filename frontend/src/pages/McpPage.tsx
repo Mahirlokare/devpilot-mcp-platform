@@ -132,15 +132,15 @@ function ServerDetails({ server }: { server: McpServer }) {
           ) : (
             <ul className="space-y-2">
               {(tools.data ?? []).map((t) => (
-                <li key={t.name} className="rounded border border-bg-border bg-bg p-2">
+                <li key={t.name} className="rounded-xl border border-bg-border bg-bg/70 p-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm text-sky-300">{t.name}</span>
+                    <span className="font-mono text-sm font-medium text-teal-400">{t.name}</span>
                     <RiskBadge risk={t.risk} />
                     {t.requires_approval && <span className="text-xs text-amber-300">requires approval</span>}
                   </div>
-                  <p className="text-xs text-slate-400">{t.description}</p>
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-xs text-slate-400">Input schema</summary>
+                  <p className="mt-1 text-xs text-slate-400">{t.description}</p>
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-xs text-slate-400 hover:text-teal-400">Input schema</summary>
                     <SchemaViewer schema={t.input_schema} />
                   </details>
                 </li>
@@ -261,18 +261,18 @@ export default function McpPage() {
               {list.map((s) => {
                 const h = healthFor(s.id);
                 return (
-                  <div key={s.id} className="card p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div key={s.id} className="card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{s.name}</span>
+                          <span className="font-display text-base font-semibold">{s.name}</span>
                           <ServerBadge status={s.status} />
-                          {s.builtin && <span className="rounded bg-slate-700/60 px-1.5 text-xs text-slate-300">built-in</span>}
-                          {!s.enabled && <span className="rounded bg-slate-700/60 px-1.5 text-xs text-slate-400">disabled</span>}
+                          {s.builtin && <span className="rounded-md bg-bg-raised px-2 py-0.5 text-xs text-slate-300">built-in</span>}
+                          {!s.enabled && <span className="rounded-md bg-bg-raised px-2 py-0.5 text-xs text-slate-400">disabled</span>}
                         </div>
-                        <p className="text-sm text-slate-400">{s.description}</p>
-                        <p className="mt-1 break-all font-mono text-xs text-slate-500">
-                          {s.transport === "stdio" ? [s.command, ...s.args].filter(Boolean).join(" ") : s.url} · {s.tool_count} tools · last connected {fmtDate(s.last_connected_at)}
+                        <p className="mt-1 text-sm text-slate-400">{s.description}</p>
+                        <p className="mt-1.5 break-all font-mono text-xs text-slate-500">
+                          {s.transport === "stdio" ? [s.command, ...s.args].filter(Boolean).join(" ") : s.url} · <span className="text-teal-400">{s.tool_count} tools</span> · last connected {fmtDate(s.last_connected_at)}
                         </p>
                         {s.env_keys.length > 0 && <p className="text-xs text-slate-500">env keys: {s.env_keys.join(", ")}</p>}
                         {h && (

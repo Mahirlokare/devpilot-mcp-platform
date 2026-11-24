@@ -102,14 +102,14 @@ export default function ToolsPage() {
                         <button
                           type="button"
                           onClick={() => selectTool(t)}
-                          className={`w-full rounded border px-2.5 py-2 text-left transition ${
+                          className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
                             isSel
-                              ? "border-sky-500/60 bg-sky-500/15"
-                              : "border-bg-border bg-bg hover:border-slate-600"
+                              ? "border-teal-500/50 bg-teal-500/15 ring-1 ring-teal-500/30"
+                              : "border-bg-border bg-bg/70 hover:border-teal-500/30 hover:bg-bg-raised/60"
                           }`}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-1">
-                            <span className="font-mono text-xs text-sky-300">
+                            <span className="font-mono text-xs font-medium text-teal-400">
                               {t.server_name}.{t.name}
                             </span>
                             <RiskBadge risk={t.risk} />
