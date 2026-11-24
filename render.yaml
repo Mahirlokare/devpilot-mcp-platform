@@ -1,8 +1,7 @@
-# Render Blueprint for DevPilot Backend + Managed PostgreSQL
-# Deploy in one click via Render Dashboard -> New -> Blueprint
+# Render Blueprint for DevPilot Full-Stack (React UI + FastAPI Backend + 7 MCP Servers)
 services:
   - type: web
-    name: devpilot-backend
+    name: devpilot-mcp-platform
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
@@ -10,28 +9,12 @@ services:
     healthCheckPath: /api/v1/health
     envVars:
       - key: DEVPILOT_ENVIRONMENT
-        value: production
+        value: development
       - key: DEVPILOT_DATABASE_URL
-        fromDatabase:
-          name: devpilot-db
-          property: connectionString
-      - key: DEVPILOT_JWT_SECRET
-        generateValue: true
-      - key: DEVPILOT_ENCRYPTION_KEY
-        sync: false
+        value: sqlite+aiosqlite:////app/workspace/devpilot.db
       - key: DEVPILOT_ALLOW_REGISTRATION
         value: "true"
       - key: DEVPILOT_TERMINAL_SANDBOX
         value: process
-      - key: DEVPILOT_TERMINAL_ALLOW_UNSANDBOXED
-        value: "true"
       - key: DEVPILOT_CORS_ORIGINS
         value: '["*"]'
-      - key: DEVPILOT_OPENAI_API_KEY
-        sync: false
-
-databases:
-  - name: devpilot-db
-    databaseName: devpilot
-    user: devpilot
-    plan: free

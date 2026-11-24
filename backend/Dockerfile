@@ -1,3 +1,11 @@
+# Multi-stage Dockerfile that builds the React/TypeScript frontend and bundles it into the FastAPI backend
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +24,8 @@ RUN pip install --no-cache-dir -e /app/backend
 
 COPY backend /app/backend
 COPY mcp_servers /app/mcp_servers
+COPY --from=frontend-build /frontend/dist /app/frontend/dist
+
 RUN mkdir -p /app/workspace && useradd -m -u 1000 devpilot && chown -R devpilot:devpilot /app
 
 USER devpilot
