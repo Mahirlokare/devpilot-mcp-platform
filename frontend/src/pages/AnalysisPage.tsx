@@ -70,6 +70,7 @@ export default function AnalysisPage() {
             className={`btn ${tool === t.id ? "btn-primary" : ""}`}
             onClick={() => {
               setTool(t.id);
+              setPath("");
               call.reset();
             }}
           >

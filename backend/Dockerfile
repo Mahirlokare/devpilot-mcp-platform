@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/pyproject.toml /app/backend/pyproject.toml
-RUN pip install --no-cache-dir -e /app/backend
+RUN pip install --no-cache-dir -e "/app/backend[dev]"
 
 COPY backend /app/backend
 COPY mcp_servers /app/mcp_servers
