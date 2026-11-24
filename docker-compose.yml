@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpilot_local_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-devpilot}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DEVPILOT_ENVIRONMENT: ${DEVPILOT_ENVIRONMENT:-development}
+      DEVPILOT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devpilot}:${POSTGRES_PASSWORD:-devpilot_local_dev}@postgres:5432/${POSTGRES_DB:-devpilot}
+      DEVPILOT_JWT_SECRET: ${DEVPILOT_JWT_SECRET:-}
+      DEVPILOT_ENCRYPTION_KEY: ${DEVPILOT_ENCRYPTION_KEY:-}
+      DEVPILOT_OPENAI_API_KEY: ${DEVPILOT_OPENAI_API_KEY:-}
+      DEVPILOT_OPENAI_MODEL: ${DEVPILOT_OPENAI_MODEL:-gpt-4o}
+      DEVPILOT_WORKSPACE_ROOT: /app/workspace
+      DEVPILOT_CORS_ORIGINS: '["http://localhost:5173","http://localhost:8080"]'
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      RENDER_API_KEY: ${RENDER_API_KEY:-}
+      VERCEL_TOKEN: ${VERCEL_TOKEN:-}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

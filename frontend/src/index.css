@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { @apply bg-bg text-slate-200 antialiased; font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+  * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+  h1, h2, h3 { @apply text-slate-100; }
+}
+
+@layer components {
+  .card { @apply rounded-lg border border-bg-border bg-bg-panel; }
+  .card-pad { @apply p-4; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-bg-border bg-bg-raised px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply border-sky-600 bg-sky-600 text-white hover:border-sky-500 hover:bg-sky-500; }
+  .btn-danger { @apply border-red-700 bg-red-700/80 text-white hover:border-red-500 hover:bg-red-600; }
+  .btn-success { @apply border-emerald-700 bg-emerald-700/80 text-white hover:border-emerald-500 hover:bg-emerald-600; }
+  .btn-sm { @apply px-2 py-1 text-xs; }
+  .input { @apply w-full rounded-md border border-bg-border bg-bg px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-60; }
+  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400; }
+  .code { @apply overflow-auto whitespace-pre-wrap break-words rounded-md border border-bg-border bg-bg p-3 font-mono text-xs text-slate-300; }
+  .th { @apply whitespace-nowrap border-b border-bg-border px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400; }
+  .td { @apply border-b border-bg-border/60 px-3 py-2 align-top text-sm; }
+}
