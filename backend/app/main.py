@@ -14,8 +14,11 @@ from .api.routes import api_router
 from .config import REPO_ROOT, get_settings
 from .db import create_all, session_factory
 from .deps import get_mcp_manager
+from .models import User
+from .security import hash_password
 from .seed_workspace import seed_workspace
 from .services.tool_gateway import ensure_builtin_servers
+from sqlalchemy import select
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -29,6 +32,10 @@ async def lifespan(_: FastAPI):
     await create_all()
     async with session_factory()() as session:
         await ensure_builtin_servers(session)
+        existing_admin = (await session.execute(select(User).where(User.username == "admin_pilot"))).scalars().first()
+        if not existing_admin:
+            session.add(User(username="admin_pilot", password_hash=hash_password("StrongPassword123!"), role="admin"))
+            await session.commit()
     try:
         yield
     finally:

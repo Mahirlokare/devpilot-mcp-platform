@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     encryption_key: str = ""  # Fernet key (urlsafe base64, 32 bytes)
     access_token_minutes: int = 60
-    allow_registration: bool = False  # the very first user can always register (becomes admin)
+    allow_registration: bool = True  # allow users to register accounts directly from the login page
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     rate_limit_per_minute: int = 120
     auth_rate_limit_per_minute: int = 10
