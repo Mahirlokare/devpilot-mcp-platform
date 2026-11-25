@@ -6,28 +6,69 @@ import { Badge, RunBadge } from "../components/Badge";
 import { ColumnChart } from "../components/Bars";
 import { Async, Card, EmptyState, PageHeader } from "../components/ui";
 
-function Stat({ label, value, sub, to, accent = "teal" }: { label: string; value: string; sub?: string; to?: string; accent?: "teal" | "cyan" | "amber" | "emerald" }) {
-  const ring = {
-    teal: "hover:border-teal-500/40",
-    cyan: "hover:border-cyan-500/40",
-    amber: "hover:border-amber-500/40",
-    emerald: "hover:border-emerald-500/40",
+function Stat({
+  label,
+  value,
+  sub,
+  to,
+  accent = "teal",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  to?: string;
+  accent?: "teal" | "cyan" | "amber" | "emerald";
+}) {
+  const accentStyles = {
+    teal: "hover:border-teal-500/45 before:from-teal-400 before:to-cyan-500",
+    cyan: "hover:border-cyan-500/45 before:from-cyan-400 before:to-sky-500",
+    amber: "hover:border-amber-500/45 before:from-amber-400 before:to-orange-500",
+    emerald: "hover:border-emerald-500/45 before:from-emerald-400 before:to-teal-500",
   }[accent];
+
   const inner = (
-    <div className={`card p-5 transition-all ${ring}`}>
+    <div
+      className={`card relative overflow-hidden p-5 transition-all duration-200 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r ${accentStyles}`}
+    >
       <p className="label">{label}</p>
-      <p className="mt-1 font-display text-2xl font-bold tracking-tight">{value}</p>
+      <p className="mt-1.5 font-display text-2xl font-bold tracking-tight">{value}</p>
       {sub && <p className="mt-1 text-xs text-slate-400">{sub}</p>}
     </div>
   );
-  return to ? <Link to={to} className="block">{inner}</Link> : inner;
+  return to ? (
+    <Link to={to} className="block transition-transform hover:-translate-y-0.5">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
 }
 
 const QUICK_ACTIONS = [
-  { to: "/workspace", title: "AI Workspace", desc: "Natural-language task planning & MCP tool orchestration" },
-  { to: "/mcp", title: "MCP Server Hub", desc: "Connect, monitor, and inspect stdio & HTTP MCP servers" },
-  { to: "/database", title: "Database Explorer", desc: "Inspect tables, run read-only SQL, and analyze query plans" },
-  { to: "/analysis", title: "Code Intelligence", desc: "Repository structure, AST complexity, duplicates & security scan" },
+  {
+    to: "/workspace",
+    badge: "AI Orchestrator",
+    title: "AI Workspace",
+    desc: "Natural-language task planning & deterministic multi-step MCP execution",
+  },
+  {
+    to: "/mcp",
+    badge: "7 Servers",
+    title: "MCP Server Hub",
+    desc: "Connect, monitor, and inspect stdio & streamable HTTP MCP servers",
+  },
+  {
+    to: "/database",
+    badge: "Read-Only AST",
+    title: "Database Explorer",
+    desc: "Inspect tables, run read-only SQL queries, and analyze EXPLAIN plans",
+  },
+  {
+    to: "/analysis",
+    badge: "Static Audit",
+    title: "Code Intelligence",
+    desc: "Repository structure, AST complexity, duplicates & security scanning",
+  },
 ];
 
 export default function DashboardPage() {
@@ -40,7 +81,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Developer Command Center"
-        subtitle="Real-time telemetry across your connected Model Context Protocol ecosystem."
+        subtitle="Real-time governance, tool telemetry, and health across your connected Model Context Protocol ecosystem."
         actions={
           <div className="flex items-center gap-2.5">
             {health.loading ? (
@@ -50,6 +91,9 @@ export default function DashboardPage() {
             ) : (
               <Badge tone="success">System Healthy ({health.data?.status})</Badge>
             )}
+            <Link to="/tools" className="btn btn-sm">
+              Explore 43 Tools
+            </Link>
             <Link to="/workspace" className="btn btn-primary btn-sm">
               + Launch AI Run
             </Link>
@@ -57,18 +101,25 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {QUICK_ACTIONS.map((q) => (
           <Link
             key={q.to}
             to={q.to}
-            className="card group flex flex-col justify-between p-4 transition-all hover:-translate-y-0.5 hover:border-teal-500/40"
+            className="card group relative flex flex-col justify-between overflow-hidden p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/45 hover:shadow-glow"
           >
             <div>
-              <div className="flex items-center justify-between">
-                <span className="font-display text-sm font-semibold group-hover:text-teal-400">{q.title}</span>
-                <span className="text-xs text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:text-teal-400">→</span>
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-teal-400">
+                  {q.badge}
+                </span>
+                <span className="text-xs text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-teal-400">
+                  →
+                </span>
               </div>
+              <span className="block font-display text-base font-bold tracking-tight group-hover:text-teal-400">
+                {q.title}
+              </span>
               <p className="mt-1 text-xs leading-relaxed text-slate-400">{q.desc}</p>
             </div>
           </Link>
@@ -78,15 +129,63 @@ export default function DashboardPage() {
       <Async loading={summary.loading} error={summary.error} onRetry={summary.reload}>
         {s && (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-              <Stat label="MCP Servers" value={`${s.servers_connected} / ${s.servers_total}`} sub="connected / registered" to="/mcp" accent="teal" />
-              <Stat label="Tool Executions" value={fmtNum(s.tool_calls_total)} sub={`${fmtNum(s.tool_calls_failed)} failed`} to="/usage" accent="cyan" />
-              <Stat label="Pending Approvals" value={fmtNum(s.pending_approvals)} sub="human-in-the-loop gate" to="/approvals" accent="amber" />
-              <Stat label="Orchestrator Runs" value={fmtNum(s.runs_total)} sub={`${fmtNum(s.runs_failed)} failed`} to="/history" accent="emerald" />
-              <Stat label="Average Latency" value={fmtDuration(s.avg_latency_ms)} sub={`p95 ${fmtDuration(s.p95_latency_ms)}`} />
-              <Stat label="Total Tokens" value={fmtNum(s.prompt_tokens + s.completion_tokens)} sub={`${fmtNum(s.prompt_tokens)} in / ${fmtNum(s.completion_tokens)} out`} />
-              <Stat label="Estimated AI Cost" value={fmtCost(s.cost_usd)} sub="cumulative session usage" />
-              <Stat label="Tool Success Rate" value={s.tool_calls_total > 0 ? `${Math.round(((s.tool_calls_total - s.tool_calls_failed) / s.tool_calls_total) * 100)}%` : "100%"} sub="verified tool responses" />
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Stat
+                label="MCP Servers"
+                value={`${s.servers_connected} / ${s.servers_total}`}
+                sub="connected / registered"
+                to="/mcp"
+                accent="teal"
+              />
+              <Stat
+                label="Tool Executions"
+                value={fmtNum(s.tool_calls_total)}
+                sub={`${fmtNum(s.tool_calls_failed)} failed invocations`}
+                to="/usage"
+                accent="cyan"
+              />
+              <Stat
+                label="Pending Approvals"
+                value={fmtNum(s.pending_approvals)}
+                sub="human-in-the-loop gate"
+                to="/approvals"
+                accent="amber"
+              />
+              <Stat
+                label="Orchestrator Runs"
+                value={fmtNum(s.runs_total)}
+                sub={`${fmtNum(s.runs_failed)} failed runs`}
+                to="/history"
+                accent="emerald"
+              />
+              <Stat
+                label="Average Latency"
+                value={fmtDuration(s.avg_latency_ms)}
+                sub={`p95 ${fmtDuration(s.p95_latency_ms)}`}
+                accent="teal"
+              />
+              <Stat
+                label="Total Tokens"
+                value={fmtNum(s.prompt_tokens + s.completion_tokens)}
+                sub={`${fmtNum(s.prompt_tokens)} in / ${fmtNum(s.completion_tokens)} out`}
+                accent="cyan"
+              />
+              <Stat
+                label="Estimated AI Cost"
+                value={fmtCost(s.cost_usd)}
+                sub="cumulative session usage"
+                accent="emerald"
+              />
+              <Stat
+                label="Tool Success Rate"
+                value={
+                  s.tool_calls_total > 0
+                    ? `${Math.round(((s.tool_calls_total - s.tool_calls_failed) / s.tool_calls_total) * 100)}%`
+                    : "100%"
+                }
+                sub="verified MCP responses"
+                accent="teal"
+              />
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
@@ -139,12 +238,17 @@ export default function DashboardPage() {
             <ul className="divide-y divide-bg-border/60">
               {(runs.data ?? []).map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-                  <Link to={`/history/${r.id}`} className="rounded-lg bg-bg-raised px-2 py-0.5 font-mono text-xs font-medium text-teal-400 hover:underline">
+                  <Link
+                    to={`/history/${r.id}`}
+                    className="rounded-lg border border-teal-500/25 bg-teal-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-teal-400 hover:bg-teal-500/20"
+                  >
                     #{r.id}
                   </Link>
                   <RunBadge status={r.status} />
                   <span className="min-w-0 flex-1 truncate font-medium">{r.objective}</span>
-                  <span className="font-mono text-xs text-slate-400">{r.step_count} steps</span>
+                  <span className="rounded-md bg-bg-raised px-2 py-0.5 font-mono text-xs text-slate-400">
+                    {r.step_count} steps
+                  </span>
                   <span className="text-xs text-slate-500">{fmtDate(r.started_at)}</span>
                 </li>
               ))}

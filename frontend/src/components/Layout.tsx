@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { approvalsApi, healthApi } from "../api/endpoints";
 import { useAsync } from "../hooks/useAsync";
 import { useAuth } from "../hooks/useAuth";
 import { Loading } from "./ui";
 
-type NavItem = { to: string; label: string; group: "Workspace" | "Ecosystem" | "Engineering" | "Governance"; icon: ReactNode };
+type NavItem = { to: string; label: string; badge?: string; group: "Workspace" | "Ecosystem" | "Engineering" | "Governance"; icon: ReactNode };
 
 const ICONS = {
   dashboard: (
@@ -98,10 +98,10 @@ const ICONS = {
 
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", group: "Workspace", icon: ICONS.dashboard },
-  { to: "/workspace", label: "AI Workspace", group: "Workspace", icon: ICONS.workspace },
+  { to: "/workspace", label: "AI Workspace", badge: "AI", group: "Workspace", icon: ICONS.workspace },
   { to: "/projects", label: "Projects", group: "Workspace", icon: ICONS.projects },
-  { to: "/mcp", label: "MCP Servers", group: "Ecosystem", icon: ICONS.mcp },
-  { to: "/tools", label: "Tool Explorer", group: "Ecosystem", icon: ICONS.tools },
+  { to: "/mcp", label: "MCP Servers", badge: "7", group: "Ecosystem", icon: ICONS.mcp },
+  { to: "/tools", label: "Tool Explorer", badge: "43", group: "Ecosystem", icon: ICONS.tools },
   { to: "/github", label: "GitHub", group: "Ecosystem", icon: ICONS.github },
   { to: "/database", label: "Database", group: "Engineering", icon: ICONS.database },
   { to: "/analysis", label: "Code Analysis", group: "Engineering", icon: ICONS.analysis },
@@ -151,29 +151,36 @@ function Layout() {
   const pendingApprovals = useAsync(() => approvalsApi.list("pending"), [loc.pathname]);
   const pendingCount = (pendingApprovals.data ?? []).length;
 
+  const activeNav = NAV.find((n) => (n.to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(n.to))) ?? NAV[0];
+
   return (
     <div className="flex h-full">
-      {open && <div className="fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-xs md:hidden" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 z-30 bg-slate-950/65 backdrop-blur-xs md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-bg-border/80 bg-bg-panel/95 backdrop-blur-md transition-transform md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-bg-border/80 bg-bg-panel/95 backdrop-blur-xl transition-transform md:static md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-bg-border/70 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-bg-border/75 px-5 py-4">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 via-teal-500 to-cyan-600 text-white shadow-[0_2px_10px_rgba(20,184,166,0.35)]">
               <span className="text-base font-bold">◆</span>
             </div>
             <div>
-              <span className="block font-display text-base font-bold tracking-tight">DevPilot</span>
-              <span className="block text-[11px] font-medium text-teal-400">MCP AI Platform</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-display text-base font-bold tracking-tight">DevPilot</span>
+                <span className="rounded-md border border-teal-500/30 bg-teal-500/10 px-1.5 py-0.2 font-mono text-[10px] font-semibold text-teal-400">
+                  v1.0
+                </span>
+              </div>
+              <span className="block text-[11px] font-medium text-slate-400">MCP AI Control Plane</span>
             </div>
-          </div>
+          </Link>
           <button
             type="button"
             onClick={toggle}
-            title={theme === "dark" ? "Switch to Calm Daylight theme" : "Switch to Soothing Twilight theme"}
+            title={theme === "dark" ? "Switch to Enterprise Daylight theme" : "Switch to Obsidian Dark theme"}
             aria-label="Toggle theme"
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-bg-border bg-bg-raised/70 text-slate-400 transition hover:border-teal-500/40 hover:text-teal-400"
           >
@@ -193,22 +200,26 @@ function Layout() {
                     end={n.to === "/"}
                     onClick={() => setOpen(false)}
                     className={({ isActive }) =>
-                      `group flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-all ${
+                      `group relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-all ${
                         isActive
-                          ? "bg-teal-500/15 text-teal-400 shadow-xs ring-1 ring-teal-500/30"
-                          : "text-slate-400 hover:bg-bg-raised/80 hover:text-slate-200"
+                          ? "bg-gradient-to-r from-teal-500/18 to-cyan-500/8 text-teal-300 shadow-xs ring-1 ring-teal-500/35"
+                          : "text-slate-400 hover:bg-bg-raised/75 hover:text-slate-200"
                       }`
                     }
                   >
                     <span className="flex items-center gap-2.5">
-                      <span className="opacity-80 group-hover:opacity-100">{n.icon}</span>
+                      <span className="opacity-85 transition-transform group-hover:scale-105 group-hover:opacity-100">{n.icon}</span>
                       <span>{n.label}</span>
                     </span>
-                    {n.to === "/approvals" && pendingCount > 0 && (
+                    {n.to === "/approvals" && pendingCount > 0 ? (
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-300 ring-1 ring-amber-500/40">
                         {pendingCount}
                       </span>
-                    )}
+                    ) : n.badge ? (
+                      <span className="rounded-md border border-bg-border/80 bg-bg-raised/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 group-hover:border-teal-500/30 group-hover:text-teal-300">
+                        {n.badge}
+                      </span>
+                    ) : null}
                   </NavLink>
                 ))}
               </div>
@@ -216,18 +227,20 @@ function Layout() {
           ))}
         </nav>
 
-        <div className="border-t border-bg-border/70 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-bg-border/70 bg-bg/60 px-3 py-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-500/15 font-display text-xs font-bold uppercase text-teal-400 ring-1 ring-teal-500/30">
+        <div className="border-t border-bg-border/75 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-bg-border/80 bg-bg/65 px-3 py-2.5 shadow-inner">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500/25 to-cyan-500/15 font-display text-xs font-bold uppercase text-teal-300 ring-1 ring-teal-500/35">
               {(user?.username ?? "U").slice(0, 2)}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-slate-200">{user?.username}</p>
-              <p className="text-[11px] capitalize text-teal-400">{user?.role}</p>
+              <p className="text-[11px] capitalize text-teal-400">{user?.role} Role</p>
             </div>
             <span
               title={health.error ? "API unreachable" : "API healthy"}
-              className={`h-2 w-2 rounded-full ${health.error ? "bg-rose-400" : "bg-emerald-400"}`}
+              className={`h-2.5 w-2.5 rounded-full ${
+                health.error ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]" : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+              }`}
             />
           </div>
           <button className="btn btn-sm w-full" onClick={logout}>
@@ -237,16 +250,47 @@ function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-2 border-b border-bg-border bg-bg-panel/90 px-4 py-3 backdrop-blur-md md:hidden">
-          <div className="flex items-center gap-2.5">
-            <button className="btn btn-sm" aria-label="Open menu" onClick={() => setOpen(true)}>
+        {/* Mobile & Desktop Executive Top Bar */}
+        <header className="flex items-center justify-between gap-3 border-b border-bg-border/75 bg-bg-panel/85 px-4 py-3 backdrop-blur-md md:px-8">
+          <div className="flex items-center gap-3">
+            <button className="btn btn-sm md:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
               ☰
             </button>
-            <span className="font-display font-bold">DevPilot</span>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span className="font-medium text-slate-500">{activeNav.group}</span>
+              <span className="text-slate-600">/</span>
+              <span className="font-semibold text-slate-200">{activeNav.label}</span>
+            </div>
           </div>
-          <button className="btn btn-sm" onClick={toggle} aria-label="Toggle theme">
-            {theme === "dark" ? "☀ Daylight" : "☾ Twilight"}
-          </button>
+
+          <div className="flex items-center gap-2.5">
+            <div className="hidden items-center gap-2 rounded-full border border-bg-border/80 bg-bg-raised/60 px-3 py-1 text-xs sm:flex">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  health.error ? "bg-rose-400" : "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                }`}
+              />
+              <span className="font-mono text-[11px] text-slate-300">
+                {health.error ? "Control Plane Offline" : "MCP Gateway Online"}
+              </span>
+            </div>
+
+            <Link to="/workspace" className="btn btn-sm hidden sm:inline-flex">
+              ✦ AI Prompt
+            </Link>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-sm hidden lg:inline-flex"
+              title="Open FastAPI Swagger Documentation"
+            >
+              OpenAPI Docs ↗
+            </a>
+            <button className="btn btn-sm" onClick={toggle} aria-label="Toggle theme">
+              {theme === "dark" ? "☀ Daylight" : "☾ Obsidian"}
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-7">

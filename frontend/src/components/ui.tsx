@@ -2,9 +2,12 @@ import type { ReactNode } from "react";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-bg-border/60 pb-4">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">{title}</h1>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-bg-border/75 bg-gradient-to-r from-bg-panel/95 via-bg-panel/90 to-bg-raised/60 px-6 py-4 shadow-soft">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2.5">
+          <span className="h-2 w-2 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_8px_rgba(20,184,166,0.8)]" aria-hidden />
+          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
+        </div>
         {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2.5">{actions}</div>}
@@ -14,9 +17,9 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`card ${className}`}>
+    <section className={`card overflow-hidden ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-bg-border/70 px-5 py-3.5">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-bg-border/75 bg-bg-raised/35 px-5 py-3.5">
           <h2 className="font-display text-sm font-semibold tracking-tight">{title}</h2>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
@@ -48,7 +51,7 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
   return (
     <div
       role="alert"
-      className="flex items-start justify-between gap-3 rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+      className="flex items-start justify-between gap-3 rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 shadow-xs"
     >
       <span className="whitespace-pre-wrap break-words">{message}</span>
       {onRetry && (
@@ -62,7 +65,7 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-bg-border bg-bg/40 px-5 py-8 text-center text-sm text-slate-400">
+    <div className="rounded-xl border border-dashed border-bg-border/90 bg-bg/45 px-5 py-8 text-center text-sm text-slate-400">
       {children}
     </div>
   );
@@ -74,7 +77,7 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "warning" 
     warning: "border-amber-500/35 bg-amber-500/10 text-amber-200",
     success: "border-emerald-500/35 bg-emerald-500/10 text-emerald-200",
   }[tone];
-  return <div className={`rounded-xl border px-4 py-2.5 text-sm ${c}`}>{children}</div>;
+  return <div className={`rounded-xl border px-4 py-2.5 text-sm shadow-xs ${c}`}>{children}</div>;
 }
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {

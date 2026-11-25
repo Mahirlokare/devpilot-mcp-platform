@@ -24,8 +24,10 @@ export default {
         mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       boxShadow: {
-        soft: "0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 16px -2px rgba(15, 23, 42, 0.06)",
-        glow: "0 0 0 1px rgba(20, 184, 166, 0.22), 0 8px 28px -6px rgba(20, 184, 166, 0.16)",
+        xs: "0 1px 2px 0 rgba(15, 23, 42, 0.06)",
+        soft: "0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(15, 23, 42, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)",
+        glow: "0 0 0 1px rgba(20, 184, 166, 0.28), 0 12px 32px -8px rgba(20, 184, 166, 0.22), inset 0 1px 0 0 rgba(255, 255, 255, 0.12)",
+        elevated: "0 4px 20px -2px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.07)",
       },
     },
   },
