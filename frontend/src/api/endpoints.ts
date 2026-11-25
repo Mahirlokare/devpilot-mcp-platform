@@ -5,6 +5,8 @@ import type {
   Approval,
   AuditEvent,
   AuthConfig,
+  ConnectedWebsite,
+  ConnectedWebsiteInput,
   Conversation,
   ConversationDetail,
   GithubStatus,
@@ -50,8 +52,16 @@ export const usersApi = {
 
 export const githubApi = {
   authorize: () => http.get<{ authorize_url: string }>("/integrations/github/authorize"),
+  connect: (b: { token?: string | null; username_or_repo?: string | null }) =>
+    http.post<GithubStatus>("/integrations/github/connect", b),
   status: () => http.get<GithubStatus>("/integrations/github/status"),
   disconnect: () => http.delete("/integrations/github"),
+};
+
+export const websitesApi = {
+  list: () => http.get<ConnectedWebsite[]>("/integrations/websites"),
+  connect: (b: ConnectedWebsiteInput) => http.post<ConnectedWebsite>("/integrations/websites", b),
+  disconnect: (id: number) => http.delete(`/integrations/websites/${id}`),
 };
 
 export const projectsApi = {

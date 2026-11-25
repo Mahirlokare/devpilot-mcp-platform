@@ -118,18 +118,25 @@ async def build_launch_spec(
         env["DEVPILOT_PROJECT_DB_URL"] = s.project_db_url
     env.update(decode_kv(server.env_encrypted))
 
-    # Inject user's GitHub OAuth credential if connecting the github server and GITHUB_TOKEN isn't already set
-    if server.name == "github" and "GITHUB_TOKEN" not in env and user_id is not None:
-        cred = (
-            await session.execute(
-                select(Credential).where(Credential.user_id == user_id, Credential.provider == "github")
-            )
-        ).scalars().first()
+    # Inject user's GitHub OAuth / PAT / Public credential if connecting the github server and GITHUB_TOKEN isn't already set
+    if server.name == "github" and "GITHUB_TOKEN" not in env:
+        cred = None
+        if user_id is not None:
+            cred = (
+                await session.execute(
+                    select(Credential).where(Credential.user_id == user_id, Credential.provider == "github")
+                )
+            ).scalars().first()
         if cred:
             try:
                 env["GITHUB_TOKEN"] = decrypt_secret(cred.token_encrypted)
             except ValueError:
-                pass
+                env["GITHUB_TOKEN"] = "__PUBLIC__"
+            if cred.account_login:
+                env["DEVPILOT_GITHUB_PUBLIC_USER"] = cred.account_login
+        else:
+            env["GITHUB_TOKEN"] = "__PUBLIC__"
+            env.setdefault("DEVPILOT_GITHUB_PUBLIC_USER", "Mahirlokare")
 
     headers = decode_kv(server.headers_encrypted)
     cmd = server.command or s.python_executable

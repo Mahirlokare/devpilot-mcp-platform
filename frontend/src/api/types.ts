@@ -23,6 +23,26 @@ export interface AuthConfig {
 export interface GithubStatus {
   connected: boolean;
   login: string | null;
+  mode?: "pat" | "public" | "oauth" | null;
+  default_repo?: string | null;
+}
+
+export type WebsiteKind = "website" | "openapi" | "github" | "rest_api" | "docs";
+
+export interface ConnectedWebsite {
+  id: number;
+  name: string;
+  url: string;
+  kind: WebsiteKind;
+  has_auth: boolean;
+  created_at: string;
+}
+
+export interface ConnectedWebsiteInput {
+  name: string;
+  url: string;
+  kind?: WebsiteKind;
+  auth_token?: string | null;
 }
 
 export interface Project {

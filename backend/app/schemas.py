@@ -286,3 +286,25 @@ class AuditOut(ORM):
     tool_name: str | None
     detail: dict[str, Any]
     outcome: str
+
+
+# ---- external integrations (GitHub direct connect & external websites) ----
+class GithubDirectConnectIn(BaseModel):
+    token: str | None = Field(default=None, max_length=500)
+    username_or_repo: str | None = Field(default=None, max_length=300)
+
+
+class ConnectedWebsiteIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    url: str = Field(min_length=8, max_length=2000)
+    kind: Literal["website", "openapi", "github", "rest_api", "docs"] = "website"
+    auth_token: str | None = Field(default=None, max_length=1000)
+
+
+class ConnectedWebsiteOut(BaseModel):
+    id: int
+    name: str
+    url: str
+    kind: str
+    has_auth: bool
+    created_at: datetime

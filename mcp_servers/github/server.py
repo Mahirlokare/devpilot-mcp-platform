@@ -62,6 +62,10 @@ def _token() -> str:
     return token
 
 
+def _public_user() -> str:
+    return os.environ.get("DEVPILOT_GITHUB_PUBLIC_USER", "").strip()
+
+
 def _scrub(text: str, limit: int = 500) -> str:
     """Remove the token itself plus anything that looks like a credential, then truncate."""
     token = os.environ.get("GITHUB_TOKEN", "").strip()
@@ -123,12 +127,16 @@ def _raise_for_status(resp: httpx.Response, not_found: str | None) -> None:
 
 async def _request(method: str, path: str, *, params: dict[str, Any] | None = None,
                    json: Any = None, not_found: str | None = None) -> httpx.Response:
+    tok = _token()
+    if tok == "__PUBLIC__" and method != "GET":
+        raise ToolError("Write operations on GitHub require a Personal Access Token. Connect a GitHub PAT in DevPilot.")
     headers = {
-        "Authorization": f"Bearer {_token()}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": API_VERSION,
         "User-Agent": "devpilot-mcp-github",
     }
+    if tok != "__PUBLIC__":
+        headers["Authorization"] = f"Bearer {tok}"
     url = f"{API_BASE}{path}"
     attempts = (MAX_RETRIES + 1) if method == "GET" else 1
     last_exc: Exception | None = None
@@ -267,7 +275,18 @@ async def list_repositories(visibility: Literal["all", "public", "private"] = "a
     _check_limit(limit)
     if visibility not in ("all", "public", "private"):
         raise ToolError("visibility must be one of: all, public, private.")
-    items, truncated = await _paginate("/user/repos", {"visibility": visibility, "sort": "updated"}, limit)
+    tok = _token()
+    pub_user = _public_user()
+    if tok == "__PUBLIC__":
+        target_user = pub_user or "Mahirlokare"
+        items, truncated = await _paginate(
+            f"/users/{quote(target_user, safe='')}/repos",
+            {"type": "owner", "sort": "updated"},
+            limit,
+            not_found=f"GitHub user or organization {target_user!r} not found.",
+        )
+    else:
+        items, truncated = await _paginate("/user/repos", {"visibility": visibility, "sort": "updated"}, limit)
     repos = [{"full_name": r.get("full_name"), "private": r.get("private"), "fork": r.get("fork"),
               "archived": r.get("archived"), "description": _trunc(r.get("description"), 300),
               "language": r.get("language"), "default_branch": r.get("default_branch"),

@@ -1,10 +1,12 @@
 """API v1 routers matching docs/API_CONTRACT.md."""
 from __future__ import annotations
 
+import json
+import re
 import secrets
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -40,11 +42,14 @@ from ..models import (
 from ..schemas import (
     ApprovalOut,
     AuditOut,
+    ConnectedWebsiteIn,
+    ConnectedWebsiteOut,
     ConversationDetail,
     ConversationIn,
     ConversationOut,
     Credentials,
     DecisionIn,
+    GithubDirectConnectIn,
     McpServerIn,
     McpServerOut,
     McpServerPatch,
@@ -70,7 +75,7 @@ from ..schemas import (
     UserOut,
     UserRoleUpdate,
 )
-from ..security import create_access_token, encrypt_secret, hash_password, verify_password
+from ..security import create_access_token, decrypt_secret, encrypt_secret, hash_password, verify_password
 from ..services import audit
 from ..services.mcp_manager import McpError, McpManager
 from ..services.orchestrator import Orchestrator
@@ -260,13 +265,136 @@ async def github_status(
     cred = (
         await session.execute(select(Credential).where(Credential.user_id == user.id, Credential.provider == "github"))
     ).scalars().first()
-    return {"connected": cred is not None, "login": cred.account_login if cred else None}
+    if not cred:
+        return {"connected": False, "login": None, "mode": None, "default_repo": None}
+    mode = "pat"
+    try:
+        raw_tok = decrypt_secret(cred.token_encrypted)
+        if raw_tok == "__PUBLIC__":
+            mode = "public"
+    except Exception:
+        pass
+    default_repo = cred.scopes if (cred.scopes and "/" in cred.scopes and " " not in cred.scopes) else None
+    return {
+        "connected": True,
+        "login": cred.account_login,
+        "mode": mode,
+        "default_repo": default_repo,
+    }
+
+
+def _parse_github_target(raw: str) -> tuple[str, str | None]:
+    """Extract (username_or_org, optional_full_repo) from a GitHub URL, owner/repo, or username."""
+    cleaned = raw.strip()
+    if cleaned.startswith(("https://github.com/", "http://github.com/", "github.com/")):
+        cleaned = re.sub(r"^https?://", "", cleaned)
+        cleaned = cleaned[len("github.com/") :]
+    cleaned = cleaned.strip("/")
+    if cleaned.endswith(".git"):
+        cleaned = cleaned[:-4]
+    parts = [p for p in cleaned.split("/") if p]
+    if len(parts) >= 2:
+        owner, repo = parts[0], parts[1]
+        if re.match(r"^[A-Za-z0-9_.-]{1,100}$", owner) and re.match(r"^[A-Za-z0-9_.-]{1,100}$", repo):
+            return owner, f"{owner}/{repo}"
+    if len(parts) == 1 and re.match(r"^[A-Za-z0-9_.-]{1,100}$", parts[0]):
+        return parts[0], None
+    raise HTTPException(
+        status_code=400,
+        detail="Enter a valid GitHub username (e.g. Mahirlokare), repository (owner/repo), or https://github.com/owner/repo URL.",
+    )
+
+
+@api_router.post("/integrations/github/connect")
+async def github_direct_connect(
+    body: GithubDirectConnectIn,
+    user: User = Depends(require_developer_or_admin),
+    session: AsyncSession = Depends(get_session),
+    manager: McpManager = Depends(get_mcp_manager),
+) -> dict[str, Any]:
+    token = (body.token or "").strip()
+    target = (body.username_or_repo or "").strip()
+    if not token and not target:
+        target = "Mahirlokare/devpilot-mcp-platform"
+
+    login_name: str | None = None
+    default_repo: str | None = None
+    stored_secret = "__PUBLIC__"
+    mode = "public"
+
+    if target:
+        login_name, default_repo = _parse_github_target(target)
+
+    if token:
+        mode = "pat"
+        stored_secret = token
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                u_resp = await client.get(
+                    "https://api.github.com/user",
+                    headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+                )
+                if u_resp.status_code == 401:
+                    raise HTTPException(status_code=400, detail="GitHub rejected the Personal Access Token (401 Unauthorized).")
+                if u_resp.status_code == 200:
+                    login_name = u_resp.json().get("login") or login_name
+        except HTTPException:
+            raise
+        except Exception:
+            login_name = login_name or "github_user"
+
+    login_name = login_name or "Mahirlokare"
+    existing = (
+        await session.execute(select(Credential).where(Credential.user_id == user.id, Credential.provider == "github"))
+    ).scalars().first()
+    if existing:
+        existing.token_encrypted = encrypt_secret(stored_secret)
+        existing.account_login = login_name
+        existing.scopes = default_repo or ("repo read:user" if mode == "pat" else None)
+    else:
+        session.add(
+            Credential(
+                user_id=user.id,
+                provider="github",
+                account_login=login_name,
+                token_encrypted=encrypt_secret(stored_secret),
+                scopes=default_repo or ("repo read:user" if mode == "pat" else None),
+            )
+        )
+    await session.commit()
+
+    # Reconnect the built-in github MCP server so the new token/public user takes effect immediately
+    gh_srv = (await session.execute(select(McpServer).where(McpServer.name == "github"))).scalars().first()
+    if gh_srv:
+        try:
+            await manager.disconnect(gh_srv.id)
+            spec = await build_launch_spec(session, gh_srv, user_id=user.id)
+            await manager.connect(gh_srv.id, gh_srv.name, spec)
+            gh_srv.last_connected_at = datetime.now(timezone.utc)
+            gh_srv.last_error = None
+            await session.commit()
+        except Exception:
+            pass
+
+    await audit.record(
+        session,
+        "integration.github_connected",
+        actor=user.username,
+        detail={"login": login_name, "mode": mode, "default_repo": default_repo},
+    )
+    return {
+        "connected": True,
+        "login": login_name,
+        "mode": mode,
+        "default_repo": default_repo,
+    }
 
 
 @api_router.delete("/integrations/github", status_code=status.HTTP_204_NO_CONTENT)
 async def github_disconnect(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    manager: McpManager = Depends(get_mcp_manager),
 ) -> Response:
     cred = (
         await session.execute(select(Credential).where(Credential.user_id == user.id, Credential.provider == "github"))
@@ -274,6 +402,98 @@ async def github_disconnect(
     if cred:
         await session.delete(cred)
         await session.commit()
+    gh_srv = (await session.execute(select(McpServer).where(McpServer.name == "github"))).scalars().first()
+    if gh_srv:
+        await manager.disconnect(gh_srv.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ===================================================================== EXTERNAL WEBSITES & API INTEGRATIONS
+def _cred_to_website_out(c: Credential) -> ConnectedWebsiteOut:
+    meta: dict[str, Any] = {}
+    if c.account_login:
+        try:
+            meta = json.loads(c.account_login)
+        except Exception:
+            meta = {"name": c.account_login, "url": c.scopes or "", "kind": "website"}
+    has_auth = False
+    try:
+        tok = decrypt_secret(c.token_encrypted)
+        has_auth = bool(tok and tok != "__NONE__")
+    except Exception:
+        pass
+    return ConnectedWebsiteOut(
+        id=c.id,
+        name=str(meta.get("name") or "External Website"),
+        url=str(meta.get("url") or c.scopes or ""),
+        kind=str(meta.get("kind") or "website"),
+        has_auth=has_auth,
+        created_at=c.created_at,
+    )
+
+
+@api_router.get("/integrations/websites", response_model=list[ConnectedWebsiteOut])
+async def list_connected_websites(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ConnectedWebsiteOut]:
+    rows = (
+        await session.execute(
+            select(Credential)
+            .where(Credential.user_id == user.id, Credential.provider.like("website:%"))
+            .order_by(Credential.id.desc())
+        )
+    ).scalars().all()
+    return [_cred_to_website_out(r) for r in rows]
+
+
+@api_router.post("/integrations/websites", response_model=ConnectedWebsiteOut)
+async def connect_website(
+    body: ConnectedWebsiteIn,
+    user: User = Depends(require_developer_or_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ConnectedWebsiteOut:
+    raw_url = body.url.strip()
+    if not raw_url.startswith(("http://", "https://")):
+        raw_url = "https://" + raw_url
+    parts = urlsplit(raw_url)
+    if not parts.hostname:
+        raise HTTPException(status_code=400, detail="Please enter a valid website URL (e.g. https://example.com).")
+
+    provider_key = f"website:{secrets.token_hex(6)}"
+    meta_json = json.dumps({"name": body.name.strip(), "url": raw_url, "kind": body.kind})
+    secret_val = (body.auth_token or "").strip() or "__NONE__"
+
+    cred = Credential(
+        user_id=user.id,
+        provider=provider_key,
+        account_login=meta_json,
+        token_encrypted=encrypt_secret(secret_val),
+        scopes=raw_url[:500],
+    )
+    session.add(cred)
+    await session.commit()
+    await session.refresh(cred)
+    await audit.record(
+        session,
+        "integration.website_connected",
+        actor=user.username,
+        detail={"name": body.name.strip(), "url": raw_url, "kind": body.kind},
+    )
+    return _cred_to_website_out(cred)
+
+
+@api_router.delete("/integrations/websites/{website_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def disconnect_website(
+    website_id: int,
+    user: User = Depends(require_developer_or_admin),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    cred = await session.get(Credential, website_id)
+    if not cred or cred.user_id != user.id or not cred.provider.startswith("website:"):
+        raise HTTPException(status_code=404, detail="Connected website not found")
+    await session.delete(cred)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

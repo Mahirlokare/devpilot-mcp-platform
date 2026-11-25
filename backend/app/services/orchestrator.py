@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import session_factory
-from ..models import Approval, Conversation, McpServer, Message, Project, ProjectMemory, Run, RunStep, User
+from ..models import Approval, Conversation, Credential, McpServer, Message, Project, ProjectMemory, Run, RunStep, User
 from . import audit
 from .mcp_manager import McpManager
 from .tool_gateway import build_launch_spec, execute_raw_tool, invoke_tool_with_policy
@@ -118,6 +118,9 @@ def _deterministic_plan(
     objective: str,
     project: Project | None,
     available_tools: set[tuple[str, str]],
+    *,
+    default_github_repo: str | None = None,
+    connected_websites: list[str] | None = None,
 ) -> list[tuple[str, str, dict[str, Any]]]:
     """Fallback planner used only when DEVPILOT_OPENAI_API_KEY is not configured.
 
@@ -126,13 +129,32 @@ def _deterministic_plan(
     """
     text = objective.lower()
     plan: list[tuple[str, str, dict[str, Any]]] = []
-    repo = project.repo_full_name if project and project.repo_full_name else None
-    m_repo = re.search(r"\b([a-z0-9_.-]+/[a-z0-9_.-]+)\b", objective, re.I)
-    if m_repo and not m_repo.group(1).startswith(("http/", "api/", "v1/")):
-        repo = m_repo.group(1)
+    repo = (project.repo_full_name if project and project.repo_full_name else None) or default_github_repo
+
+    # Extract explicit https://github.com/owner/repo URL first
+    m_gh_url = re.search(r"https?://(?:www\.)?github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", objective)
+    if m_gh_url:
+        repo = m_gh_url.group(1).removesuffix(".git")
+    else:
+        # Remove full URLs before looking for bare owner/repo patterns
+        stripped_obj = re.sub(r"https?://\S+", " ", objective)
+        m_repo = re.search(r"\b([a-z0-9_.-]+/[a-z0-9_.-]+)\b", stripped_obj, re.I)
+        if m_repo and not m_repo.group(1).lower().startswith(("http/", "https/", "api/", "v1/", "application/", "text/")):
+            repo = m_repo.group(1)
+
+    # Extract non-GitHub HTTP/HTTPS URLs from the objective (or fallback to connected websites if user asks about a website)
+    raw_urls = [
+        u.rstrip(").,;\"'>]")
+        for u in re.findall(r"https?://[^\s<>\"')]+", objective)
+        if "github.com/" not in u.lower()
+    ]
+    if not raw_urls and connected_websites and any(
+        k in text for k in ("website", "web page", "webpage", "url", "openapi", "swagger", "endpoint", "fetch", "site", "external")
+    ):
+        raw_urls = [connected_websites[0]]
 
     if any(k in text for k in ("architecture", "structure", "overview", "analyze project", "analyze repo", "explain")):
-        if ("filesystem", "analyze_structure") in available_tools:
+        if ("filesystem", "analyze_structure") in available_tools and not m_gh_url and not raw_urls:
             plan.append(("filesystem", "analyze_structure", {}))
     if any(k in text for k in ("security", "vulnerabilit", "bug", "insecure", "secret", "audit code")):
         if ("filesystem", "scan_security") in available_tools:
@@ -151,13 +173,25 @@ def _deterministic_plan(
         if "run" in text and ("testing", "run_tests") in available_tools:
             fw = "vitest" if "vitest" in text else ("jest" if "jest" in text else "pytest")
             plan.append(("testing", "run_tests", {"framework": fw}))
-    if any(k in text for k in ("github", "pull request", "pr ", "commits", "branches", "issues")):
+    if m_gh_url or any(k in text for k in ("github", "pull request", "pr ", "commits", "branches", "issues", "repo")):
         if repo and ("github", "get_repository") in available_tools:
             plan.append(("github", "get_repository", {"repo": repo}))
         elif ("github", "list_repositories") in available_tools:
             plan.append(("github", "list_repositories", {"limit": 10}))
+        if repo and ("tree" in text or "files" in text or "structure" in text) and ("github", "get_repository_tree") in available_tools:
+            plan.append(("github", "get_repository_tree", {"repo": repo}))
+        if repo and ("commit" in text) and ("github", "list_commits") in available_tools:
+            plan.append(("github", "list_commits", {"repo": repo, "limit": 10}))
         if repo and ("pull request" in text or "pr" in text) and ("github", "list_pull_requests") in available_tools:
             plan.append(("github", "list_pull_requests", {"repo": repo}))
+        if repo and ("issue" in text) and ("github", "list_issues") in available_tools:
+            plan.append(("github", "list_issues", {"repo": repo}))
+    for target_url in raw_urls[:2]:
+        is_openapi = any(k in target_url.lower() or k in text for k in ("openapi", "swagger", ".yaml", ".yml"))
+        if is_openapi and ("apidocs", "summarize_openapi") in available_tools:
+            plan.append(("apidocs", "summarize_openapi", {"url": target_url}))
+        elif ("apidocs", "fetch_website") in available_tools:
+            plan.append(("apidocs", "fetch_website", {"url": target_url}))
     if any(k in text for k in ("deploy", "service", "rollback", "render", "vercel")):
         if ("deployment", "list_services") in available_tools:
             plan.append(("deployment", "list_services", {}))
@@ -278,6 +312,18 @@ class Orchestrator:
         project: Project | None,
     ) -> None:
         s = get_settings()
+        # Lookup user's connected GitHub repo & external websites so the planner can access them directly
+        user_creds = list(
+            (await session.execute(select(Credential).where(Credential.user_id == user.id))).scalars().all()
+        )
+        default_gh_repo: str | None = None
+        connected_urls: list[str] = []
+        for c in user_creds:
+            if c.provider == "github" and c.scopes and "/" in c.scopes and " " not in c.scopes:
+                default_gh_repo = c.scopes
+            elif c.provider.startswith("website:") and c.scopes:
+                connected_urls.append(c.scopes)
+
         # First compute candidate plan against all known built-in tools, then connect only the servers needed
         all_known_tools = {
             ("filesystem", "analyze_structure"),
@@ -289,11 +335,22 @@ class Orchestrator:
             ("testing", "detect_frameworks"),
             ("testing", "run_tests"),
             ("github", "get_repository"),
+            ("github", "get_repository_tree"),
             ("github", "list_repositories"),
+            ("github", "list_commits"),
             ("github", "list_pull_requests"),
+            ("github", "list_issues"),
+            ("apidocs", "fetch_website"),
+            ("apidocs", "summarize_openapi"),
             ("deployment", "list_services"),
         }
-        candidate_plan = _deterministic_plan(run.objective, project, all_known_tools)
+        candidate_plan = _deterministic_plan(
+            run.objective,
+            project,
+            all_known_tools,
+            default_github_repo=default_gh_repo,
+            connected_websites=connected_urls,
+        )
         needed_servers = {srv_name for srv_name, _, _ in candidate_plan}
         servers_by_name = await _ensure_connected_servers(session, self.manager, user, project, needed_names=needed_servers)
 
@@ -313,7 +370,13 @@ class Orchestrator:
             if st.status in {"succeeded", "failed", "denied"}
         }
 
-        plan = _deterministic_plan(run.objective, project, available)
+        plan = _deterministic_plan(
+            run.objective,
+            project,
+            available,
+            default_github_repo=default_gh_repo,
+            connected_websites=connected_urls,
+        )
         next_idx = (max((st.index for st in existing_steps), default=0)) + 1
 
         for srv_name, tool_name, args in plan:
